@@ -72,23 +72,24 @@ class Block(LeafSystem):
         derivatives.get_mutable_vector().SetFromVector([x[1], u])
 
     def RegisterGeometry(self, scene_graph):
+        """ Create the visual model of the system, and register in scene graph
+        :param scene_graph: nexus for all geometry in a Diagram
+        """
+        # Import the visual model
         self.mbp = MultibodyPlant()
         parser = Parser(self.mbp, scene_graph)
-
         model_id = parser.AddModelFromFile(FindResourceOrThrow("drake/examples/quadrotor/quadrotor.urdf"),
                                            "quadrotor")
         self.mbp.Finalize()
 
+        # Get ids
         self.source_id_ = self.mbp.get_source_id()
         self.frame_id_ = self.mbp.GetBodyFrameIdIfExists(self.mbp.GetBodyIndices(model_id)[0])
-
-        # self.geometry_pose_port = self.AllocateGeometryPoseOutputPort()
-
 
     def source_id(self):
         return self.source_id_
 
-
+# parse command line arguments
 parser = argparse.ArgumentParser()
 parser.add_argument("-N", "--trials",
                     type=int,
@@ -101,32 +102,32 @@ parser.add_argument("-T", "--duration",
 MeshcatVisualizer.add_argparse_argument(parser)
 args = parser.parse_args()
 
-
+# Build system diagram
 builder = DiagramBuilder()
-#plant = builder.AddSystem(QuadrotorPlant())
 plant = builder.AddSystem(Block())
 
+# Add controller
 # controller = builder.AddSystem(StabilizingLQRController(plant, [0, 0, 1]))
 # builder.Connect(controller.get_output_port(0), plant.get_input_port(0))
 command = builder.AddSystem(ConstantVectorSource([0]))
 builder.Connect(command.get_output_port(0), plant.get_input_port(0))
 # builder.Connect(plant.get_output_port(0), controller.get_input_port(0))
 
+# Connect geometry to scene graph
 scene_graph = builder.AddSystem(SceneGraph())
 plant.RegisterGeometry(scene_graph)
-
 to_pose = builder.AddSystem(MultibodyPositionToGeometryPose(plant.mbp))
 builder.Connect(plant.get_output_port(0), to_pose.get_input_port())
 builder.Connect(to_pose.get_output_port(), scene_graph.get_source_pose_port(plant.source_id()))
-# builder.Connect(plant.get_geometry_pose_output_port(), scene_graph.get_source_pose_port(plant.source_id()))
 
-
+# Add meshcat visualization
 meshcat = builder.AddSystem(MeshcatVisualizer(scene_graph, zmq_url=args.meshcat, open_browser=args.open_browser))
 builder.Connect(scene_graph.get_pose_bundle_output_port(), meshcat.get_input_port(0))
 
-
+# Build!
 diagram = builder.Build()
 
+# Simulate the system
 simulator = Simulator(diagram)
 simulator.set_target_realtime_rate(1.0)
 context = simulator.get_mutable_context()
@@ -134,6 +135,5 @@ context = simulator.get_mutable_context()
 for i in range(args.trials):
     context.set_time(0.)
     context.SetContinuousState(np.random.randn(2,))
-    # context.SetContinuousState([1, 0])
     simulator.Initialize()
     simulator.StepTo(args.duration)
