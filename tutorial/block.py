@@ -71,19 +71,6 @@ class Block(LeafSystem):
         # and derivative of vel by input, which is acceleration
         derivatives.get_mutable_vector().SetFromVector([x[1], u])
 
-    # def AllocateGeometryPoseOutputPort(self):
-    #     return self.DeclareAbstractOutputPort("geometry_pose", self.AllocPose, self.CopyPoseOut).get_index()
-
-    # def CopyPoseOut(self, context, poses):
-    #     x = context.get_continuous_state_vector().CopyToVector()
-    #     pose = RigidTransform(p=np.array([x[0], 0, 1]).reshape((3, 1)))
-    #     poses.clear()
-    #     poses.set_value(self.frame_id, pose)
-
-    # def AllocPose(self):
-    #     # poses = FramePoseVector()
-    #     return self.mbp.get_geometry_poses_output_port()
-
     def RegisterGeometry(self, scene_graph):
         self.mbp = MultibodyPlant()
         parser = Parser(self.mbp, scene_graph)
@@ -97,8 +84,6 @@ class Block(LeafSystem):
 
         # self.geometry_pose_port = self.AllocateGeometryPoseOutputPort()
 
-    # def get_geometry_pose_output_port(self):
-    #     return self.get_output_port(self.geometry_pose_port)
 
     def source_id(self):
         return self.source_id_
