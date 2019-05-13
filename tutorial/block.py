@@ -1,3 +1,5 @@
+# Simulate block movement using a quadrotor visual model
+
 import argparse
 import numpy as np
 
@@ -34,7 +36,6 @@ class Block(LeafSystem):
 
         self.source_id_ = None
         self.frame_id_ = None
-        self.geometry_pose_port = None
         self.mbp = None
 
     def CopyStateOut(self, context, output):
@@ -134,6 +135,7 @@ context = simulator.get_mutable_context()
 
 for i in range(args.trials):
     context.set_time(0.)
-    context.SetContinuousState(np.random.randn(2,))
+    # context.SetContinuousState(np.random.randn(2,))
+    context.SetContinuousState(np.zeros(2,))
     simulator.Initialize()
     simulator.StepTo(args.duration)

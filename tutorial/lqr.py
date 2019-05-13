@@ -13,6 +13,8 @@ from pydrake.systems.meshcat_visualizer import MeshcatVisualizer
 from pydrake.systems.rendering import MultibodyPositionToGeometryPose
 from pydrake.systems.primitives import AffineSystem
 
+from pydrake.all import ConstantVectorSource
+
 parser = argparse.ArgumentParser()
 parser.add_argument("-N", "--trials",
                     type=int,
@@ -30,6 +32,7 @@ builder = DiagramBuilder()
 plant = builder.AddSystem(QuadrotorPlant())
 
 controller = builder.AddSystem(StabilizingLQRController(plant, [0, 0, 1]))
+# controller = builder.AddSystem(ConstantVectorSource([0, 0, 0, 0]))
 builder.Connect(controller.get_output_port(0), plant.get_input_port(0))
 builder.Connect(plant.get_output_port(0), controller.get_input_port(0))
 
