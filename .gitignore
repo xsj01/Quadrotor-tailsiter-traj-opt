@@ -1,4 +1,6 @@
 # pycharm
 .idea
 
+# python cache
+*.pyc
 

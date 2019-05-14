@@ -57,6 +57,16 @@ class Quadrotor(LeafSystem):
         self.frame_id_ = None
         self.mbp = None
 
+    def DoHasDirectFeedthrough(self, arg0, arg1):
+        """
+        :param arg0: input port
+        :param arg1: output port
+        :return: True if there is direct-feedthrough from given input port to the given output port
+        """
+        if arg0 == 0 and arg1 == 0:
+            return False
+        return False
+
     def CopyStateOut(self, context, output):
         """ Function to obtain entire state
         :param context:  context for performing calculations
@@ -167,80 +177,81 @@ class Quadrotor(LeafSystem):
         return self.source_id_
 
 
-def LQRController(quadrotor, nominal_position=(0, 0, 1)):
-    """
-    :param quadrotor: the quadrotor system
-    :param nominal_position: the position to stabilize to
-    :return: a LQR controller that stabilizes to the nominal position
-    """
-    quad_context_goal = quadrotor.CreateDefaultContext()
+# def LQRController(quadrotor, nominal_position=(0, 0, 1)):
+#     """
+#     :param quadrotor: the quadrotor system
+#     :param nominal_position: the position to stabilize to
+#     :return: a LQR controller that stabilizes to the nominal position
+#     """
+#     quad_context_goal = quadrotor.CreateDefaultContext()
+#
+#     # target stable position
+#     x0 = np.zeros(shape=(12,))
+#     x0[:3] = nominal_position
+#
+#     # nominal input for stable position
+#     u0 = np.ones(shape=(4,))*quadrotor.m_ * quadrotor.g_ / 4
+#
+#     # Set the stabilizing target
+#     quad_context_goal.FixInputPort(0, u0)
+#     quad_context_goal.SetContinuousState(x0)
+#
+#     # Set up Q and R costs
+#     Q = np.identity(12)
+#     Q[:6, :6] = 10*np.identity(6)
+#     R = np.identity(4)
+#
+#     # linearized = Linearize(quadrotor, quad_context_goal)
+#     # print(quadrotor.mbp)
+#
+#     return LinearQuadraticRegulator(quadrotor, quad_context_goal, Q, R)
 
-    # target stable position
-    x0 = np.zeros(shape=(12,))
-    x0[:3] = nominal_position
 
-    # nominal input for stable position
-    u0 = np.ones(shape=(4,))*quadrotor.m_ * quadrotor.g_ / 4
+if __name__ == "__main__":
+    # parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-N", "--trials",
+                        type=int,
+                        help="Number of trials to run.",
+                        default=10)
+    parser.add_argument("-T", "--duration",
+                        type=float,
+                        help="Duration to run each sim.",
+                        default=4.0)
+    MeshcatVisualizer.add_argparse_argument(parser)
+    args = parser.parse_args()
 
-    # Set the stabilizing target
-    quad_context_goal.FixInputPort(0, u0)
-    quad_context_goal.SetContinuousState(x0)
+    # Build system diagram
+    builder = DiagramBuilder()
+    plant = builder.AddSystem(Quadrotor())
 
-    # Set up Q and R costs
-    Q = np.identity(12)
-    Q[:6, :6] = 10*np.identity(6)
-    R = np.identity(4)
+    # Connect geometry to scene graph
+    scene_graph = builder.AddSystem(SceneGraph())
+    plant.RegisterGeometry(scene_graph)
+    to_pose = builder.AddSystem(MultibodyPositionToGeometryPose(plant.mbp))
+    builder.Connect(plant.get_output_port(1), to_pose.get_input_port())
+    builder.Connect(to_pose.get_output_port(), scene_graph.get_source_pose_port(plant.source_id()))
 
-    # linearized = Linearize(quadrotor, quad_context_goal)
-    # print(quadrotor.mbp)
+    # Add controller
+    # controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
+    controller = builder.AddSystem(ConstantVectorSource([0, 0, 0, 0]))
+    builder.Connect(controller.get_output_port(0), plant.get_input_port(0))
+    # builder.Connect(plant.get_output_port(0), controller.get_input_port(0))
 
-    return LinearQuadraticRegulator(quadrotor, quad_context_goal, Q, R)
+    # Add meshcat visualization
+    meshcat = builder.AddSystem(MeshcatVisualizer(scene_graph, zmq_url=args.meshcat, open_browser=args.open_browser))
+    builder.Connect(scene_graph.get_pose_bundle_output_port(), meshcat.get_input_port(0))
 
+    # Build!
+    diagram = builder.Build()
 
-# parse command line arguments
-parser = argparse.ArgumentParser()
-parser.add_argument("-N", "--trials",
-                    type=int,
-                    help="Number of trials to run.",
-                    default=10)
-parser.add_argument("-T", "--duration",
-                    type=float,
-                    help="Duration to run each sim.",
-                    default=4.0)
-MeshcatVisualizer.add_argparse_argument(parser)
-args = parser.parse_args()
+    # Simulate the system
+    simulator = Simulator(diagram)
+    simulator.set_target_realtime_rate(1.0)
+    context = simulator.get_mutable_context()
 
-# Build system diagram
-builder = DiagramBuilder()
-plant = builder.AddSystem(Quadrotor())
-
-# Connect geometry to scene graph
-scene_graph = builder.AddSystem(SceneGraph())
-plant.RegisterGeometry(scene_graph)
-to_pose = builder.AddSystem(MultibodyPositionToGeometryPose(plant.mbp))
-builder.Connect(plant.get_output_port(1), to_pose.get_input_port())
-builder.Connect(to_pose.get_output_port(), scene_graph.get_source_pose_port(plant.source_id()))
-
-# Add controller
-controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
-# controller = builder.AddSystem(ConstantVectorSource([0, 0, 0, 0]))
-builder.Connect(controller.get_output_port(0), plant.get_input_port(0))
-builder.Connect(plant.get_output_port(0), controller.get_input_port(0))
-
-# Add meshcat visualization
-meshcat = builder.AddSystem(MeshcatVisualizer(scene_graph, zmq_url=args.meshcat, open_browser=args.open_browser))
-builder.Connect(scene_graph.get_pose_bundle_output_port(), meshcat.get_input_port(0))
-
-# Build!
-diagram = builder.Build()
-
-# Simulate the system
-simulator = Simulator(diagram)
-simulator.set_target_realtime_rate(1.0)
-context = simulator.get_mutable_context()
-
-for i in range(args.trials):
-    context.set_time(0.)
-    context.SetContinuousState(np.random.randn(12,))
-    simulator.Initialize()
-    simulator.StepTo(args.duration)
+    for i in range(args.trials):
+        context.set_time(0.)
+        context.SetContinuousState(np.random.randn(12,))
+        simulator.Initialize()
+        simulator.StepTo(args.duration)
