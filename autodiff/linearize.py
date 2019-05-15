@@ -1,7 +1,9 @@
 # -*- coding: utf-8 -*-
 # Contains quadrotor dynamics implementation
 import numpy as np
-from opt_math import RollPitchYaw, RotationMatrix
+from Quadrotor.math.opt_math import RollPitchYaw, RotationMatrix
+
+from pydrake.forwarddiff import jacobian, gradient, derivative
 
 
 def default_moment_of_inertia():
@@ -10,7 +12,7 @@ def default_moment_of_inertia():
                      [0, 0, 0.0040]])
 
 
-class QuadrotorDynamics:
+class QuadrotorDynamicsLinearizer:
     """ Implement quadrotor dynamics for trajectory optimization
     """
     def __init__(self, m_arg=0.5, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):
@@ -29,6 +31,11 @@ class QuadrotorDynamics:
         :return: the the time derivative of the quadrotor state
         """
         # Calculate force exerted by each motor, expressed in Body frame
+        # if autograd:
+        #     np=ag.np
+        #     RollPitchYaw=ag.RollPitchYaw
+        #     RotationMatrix=ag.RotationMatrix
+
         uF_Bz = self.kF_ * u
 
         # Compute net force, expressed in body frame
@@ -74,9 +81,38 @@ class QuadrotorDynamics:
 
         # Set derivative of pos by current velocity,
         # and derivative of vel by input, which is acceleration
-        deriv = np.zeros_like(state)
-        deriv[:6] = state[6:]
-        deriv[6:9] = xyzDDt.ravel()
+        deriv = np.zeros_like(state).tolist()
+
+        deriv[:6] = state[6:]+0*u[0]+0*u[1]+0*u[2]+0*u[3]
+
+        deriv[8]=xyzDDt[2,0]
+        deriv[7]=xyzDDt[1,0]
+        deriv[6]=xyzDDt[0,0]
         for i in range(9, 12):
-            deriv[i] = rpyDDt.ravel()[i-9][0]
-        return deriv
+            v = rpyDDt.ravel()[i-9]
+            if type(v) is np.ndarray:   
+                v=v[0]
+            deriv[i]=v   
+        return np.array(deriv)
+
+    def get_AB(self, state, u):
+        """
+        :param state: numpy array of floats, shape (12,), representing x0
+        :param u: numpy array of floats, shape (4,), representing u0
+        :return: A and B of linearized system around (x0, u0) stable point
+        """
+        def xDi_uj(uj,i,j):
+            u_input=u.astype(dtype=object)
+            u_input[j]=uj
+            return self.dynamics(state, u_input).reshape(-1)[i]
+
+        pf_px=jacobian(lambda state_:self.dynamics(state_, u), state)
+        pf_pu=jacobian(lambda u_:self.dynamics(state, u_), u)
+
+        return pf_px,pf_pu
+
+if __name__ == '__main__':
+    linearizer= QuadrotorDynamicsLinearizer()
+    state = np.ones(12, dtype=np.float64)
+    u = np.ones(4,dtype=np.float64)
+    print linearizer.get_AB(state,u)

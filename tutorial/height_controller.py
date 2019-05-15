@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from pydrake.all import (MeshcatVisualizer, DiagramBuilder, SceneGraph, MultibodyPositionToGeometryPose,
                          ConstantVectorSource, Simulator, VectorSystem, SignalLogger)
 
-from quadrotor import Quadrotor
+from ..models.quadrotor import Quadrotor
 
 
 class HeightController(VectorSystem):

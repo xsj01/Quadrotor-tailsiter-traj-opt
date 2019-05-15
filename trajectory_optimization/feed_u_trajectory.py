@@ -1,13 +1,12 @@
 # Feed u trajectory generated in trajectory optimization directly to the quadrotor model
 import argparse
+import os
 import numpy as np
-from pydrake.systems.meshcat_visualizer import MeshcatVisualizer
 from pydrake.systems.framework import VectorSystem, DiagramBuilder
-from pydrake.geometry import SceneGraph
-from pydrake.systems.rendering import MultibodyPositionToGeometryPose
-from pydrake.systems.analysis import Simulator
+from pydrake.systems.meshcat_visualizer import MeshcatVisualizer
 
-from quadrotor import Quadrotor
+from ..simulate.simulate import simulate
+from ..models.quadrotor import Quadrotor
 from utilities import load_traj
 
 
@@ -47,48 +46,6 @@ class FeedUTrajController(VectorSystem):
         y[:] = u
 
 
-def simulate(args, plant, controller, initial_state):
-    """ Simulate the system with the provided controller
-    :param args: command line arguments
-    :param plant: system plant to be simulated
-    :param controller: controller of the plant
-    :param initial_state: initial state of the plant
-    """
-    # Build system diagram
-    builder = DiagramBuilder()
-    plant = builder.AddSystem(plant)
-
-    # Connect geometry to scene graph
-    scene_graph = builder.AddSystem(SceneGraph())
-    plant.RegisterGeometry(scene_graph)
-    to_pose = builder.AddSystem(MultibodyPositionToGeometryPose(plant.mbp))
-    builder.Connect(plant.get_output_port(1), to_pose.get_input_port())
-    builder.Connect(to_pose.get_output_port(), scene_graph.get_source_pose_port(plant.source_id()))
-
-    # Add controller
-    controller = builder.AddSystem(controller)
-    builder.Connect(plant.get_output_port(0), controller.get_input_port(0))
-    builder.Connect(controller.get_output_port(0), plant.get_input_port(0))
-
-    # Add meshcat visualization
-    meshcat = builder.AddSystem(MeshcatVisualizer(scene_graph, zmq_url=args.meshcat, open_browser=args.open_browser))
-    builder.Connect(scene_graph.get_pose_bundle_output_port(), meshcat.get_input_port(0))
-
-    # Build!
-    diagram = builder.Build()
-
-    # Simulate the system
-    simulator = Simulator(diagram)
-    simulator.set_target_realtime_rate(1.0)
-    context = simulator.get_mutable_context()
-
-    for i in range(args.trials):
-        context.set_time(0.)
-        context.SetContinuousState(initial_state)
-        simulator.Initialize()
-        simulator.StepTo(args.duration)
-
-
 if __name__ == "__main__":
     # parse command line arguments
     parser = argparse.ArgumentParser()
@@ -104,11 +61,14 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Load quadrotor u trajectory, and set duration of simulation & initial state
-    filename = "traj/{}.npz".format(args.filename)
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    filename = dir_path + "/traj/{}.npz".format(args.filename)
     controller = FeedUTrajController(filename)
     args.duration = controller.final_time
-    initial_state = controller.initial_state
+
+    def initial_state_gen():
+        return controller.initial_state
 
     quadrotor = Quadrotor()
     # Display in meshcat
-    simulate(args, plant=quadrotor, controller=controller, initial_state=initial_state)
+    simulate(args, plant=quadrotor, controller=controller, initial_state_gen=initial_state_gen)
