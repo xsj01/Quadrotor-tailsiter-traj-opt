@@ -41,6 +41,7 @@ class HeightController(VectorSystem):
         # reinitialize if current time is 0.0
         if current_time == 0:
             dt = 0
+            self.integral = 0
         else:
             dt = current_time-self.current_time
         self.current_time = current_time
@@ -108,6 +109,7 @@ if __name__ == "__main__":
         simulator.Initialize()
         simulator.StepTo(args.duration)
 
+        plt.close()
         plt.figure().set_size_inches(10, 5)
         plt.plot(state_log.sample_times(), state_log.data()[2, :])
         plt.plot(state_log.sample_times(), state_log.data()[8, :])

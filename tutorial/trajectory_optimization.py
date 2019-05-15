@@ -18,6 +18,66 @@ class RollPitchYaw:
     def yaw_angle(self):
         return self.roll_pitch_yaw_[2]
 
+    def CalcAngularVelocityInChildFromRpyDt(self, rpyDt):
+        """ Calculates angular velocity from this rpy angles and rpyDt
+        :param rpyDt: time derivative of [r, p, y]
+        :return: w_AD_D, frame D's angular velocity in frame A, expressed in frame D
+        """
+        # Get the 3x3 matrix taht contains partial derivatives of rotation angles with respect to r, p, y
+        M = self.CalcMatrixRelatingAngularVelocityInChildToRpyDt()
+        return M.dot(rpyDt)
+
+    def CalcMatrixRelatingAngularVelocityInChildToRpyDt(self):
+        r = self.roll_angle()
+        p = self.pitch_angle()
+        sr = sin(r)
+        cr = cos(r)
+        sp = sin(p)
+        cp = cos(p)
+        return np.array([[1, 0, -sp],
+                         [0, cr, sr*cp],
+                         [0, -sr, cr*cp]])
+
+    def CalcRpyDDtFromRpyDtAndAngularAccelInParent(self, rpyDt, alpha_AD_A):
+        Minv = self.CalcMatrixRelatingRpyDtToAngularVelocityInParent()
+        MDt = self.CalcDtMatrixRelatingAngularVelocityInParentToRpyDt(rpyDt)
+        return Minv.dot(alpha_AD_A - MDt.dot(rpyDt))
+
+    def CalcMatrixRelatingRpyDtToAngularVelocityInParent(self):
+        p = self.pitch_angle()
+        y = self.yaw_angle()
+        sp = sin(p)
+        cp = cos(p)
+        # if self.DoesCosPitchAngleViolateGimbalLockTolerance(cp):
+        #     raise Exception("Gimbal Lock")
+        one_over_cp = 1.0/cp
+        sy = sin(y)
+        cy = cos(y)
+        cy_over_cp = cy*one_over_cp
+        sy_over_cp = sy*one_over_cp
+        return np.array([[cy_over_cp, sy_over_cp, 0],
+                         [-sy, cy, 0],
+                         [cy_over_cp*sp, sy_over_cp*sp, 1]])
+
+    def DoesCosPitchAngleViolateGimbalLockTolerance(self, cos_pitch_angle):
+        kGimbalLockToleranceCosPitchAngle = 0.008
+        return abs(cos_pitch_angle) < kGimbalLockToleranceCosPitchAngle
+
+    def CalcDtMatrixRelatingAngularVelocityInParentToRpyDt(self, rpyDt):
+        p = self.pitch_angle()
+        y = self.yaw_angle()
+        sp = sin(p)
+        cp = cos(p)
+        sy = sin(y)
+        cy = cos(y)
+        pDt = rpyDt[1]
+        yDt = rpyDt[2]
+        sp_pDt = sp*pDt
+        cp_yDt = cp*yDt
+        return np.array([[-cy*sp_pDt-sy*cp_yDt, -cy*yDt, 0],
+                         [-sy*sp_pDt+cy*cp_yDt, -sy*yDt, 0],
+                         [-cp*pDt, 0, 0]])
+
 
 class RotationMatrix:
     def __init__(self, rpy):
@@ -109,19 +169,28 @@ class QuadrotorTrajectoryOptimization:
 
         # Compute body's angular acceleration, α, in inertia frame, due to the net moment 𝛕 on body,
         # rearrange Euler rigid body equation 𝛕 = I α + ω × (I ω)  and solve for α.
-        wIw = np.cross(w_BN_B, np.matmul(self.I_, w_BN_B)).reshape((-1, 1))
-        alpha_NB_B = np.linalg.solve(self.I_, Tau_B - wIw)
-        alpha_NB_N = np.matmul(R_NB, alpha_NB_B)
+        # print(self.I_.shape)
+        # print(w_BN_B.shape)
+        # print(self.I_.dot(w_BN_B).shape)
+        wIw = np.cross(w_BN_B, self.I_.dot(w_BN_B), axis=0).reshape((-1, 1))
+        # alpha_NB_B = np.linalg.solve(self.I_, Tau_B - wIw)
+        alpha_NB_B = np.linalg.inv(self.I_).dot(Tau_B-wIw)
+        alpha_NB_N = R_NB.dot(alpha_NB_B)
 
         # Calculate the 2nd time-derivative of rpy
         rpyDDt = rpy.CalcRpyDDtFromRpyDtAndAngularAccelInParent(rpyDt, alpha_NB_N)
+        # print(rpyDDt.ravel()[0].shape)
 
         # Set derivative of pos by current velocity,
         # and derivative of vel by input, which is acceleration
-        deriv = np.zeros((12,))
+        deriv = np.zeros_like(state)
         deriv[:6] = state[6:]
         deriv[6:9] = xyzDDt.ravel()
-        deriv[9:] = rpyDDt.ravel()
+        for i in range(9, 12):
+            # print(rpyDDt.ravel()[i-9][0])
+            deriv[i] = rpyDDt.ravel()[i-9][0]
+        # deriv[9:] = rpyDDt.ravel()
+        # print(deriv[9])
         return deriv
 
     def two_norm(self, x):
@@ -136,7 +205,7 @@ class QuadrotorTrajectoryOptimization:
         slack = .001
         return np.sqrt(((x)**2).sum() + slack)
 
-    def compute_trajectory_to_pose(self, state_initial=np.zeros((12,)), target_pose=(0, 0, 1, 0, 0, 0), minimum_time=5, maximum_time=10):
+    def compute_trajectory_to_pose(self, state_initial=np.zeros((12,)), target_state=(0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0), minimum_time=3, maximum_time=10):
         """ Use trajectory optimization to compute control to target pose
         :param state_initial: initial state
         :param target_pose: target_pose, consisting of (x, y, z, roll, pitch, yaw)
@@ -148,7 +217,7 @@ class QuadrotorTrajectoryOptimization:
         mp = MathematicalProgram()
 
         # Set up knot points
-        num_time_steps = 50
+        num_time_steps = 100
         dt = mp.NewContinuousVariables(1, "dt")
         time_array = 0.0
         for i in range(1, num_time_steps+1):
@@ -180,6 +249,8 @@ class QuadrotorTrajectoryOptimization:
             next_state = states_over_time[i+1]
             u = u_over_time[i]
             for j in range(12):
+                # print(j)
+                # print(self.quadrotor_dynamics(current_state, u)[j])
                 mp.AddConstraint(next_state[j] - current_state[j] - self.quadrotor_dynamics(current_state, u)[j] * dt[0] >= 0)
                 mp.AddConstraint(next_state[j] - current_state[j] - self.quadrotor_dynamics(current_state, u)[j] * dt[0] <= 0)
 
@@ -191,9 +262,13 @@ class QuadrotorTrajectoryOptimization:
         mp.AddQuadraticCost(((u_over_time[:, 0]**2 + u_over_time[:, 1]**2 + u_over_time[:, 2]**2 + u_over_time[:, 3]**2).sum()))
 
         # Reach final pose
+        # for j in range(6):
+        #     mp.AddConstraint(final_pose[j] <= target_pose[j])
+        #     mp.AddConstraint(final_pose[j] >= target_pose[j])
+        # Reach final state
         for j in range(12):
-            mp.AddConstraint(final_pose[j] <= target_pose[j])
-            mp.AddConstraint(final_pose[j] >= target_pose[j])
+            mp.AddConstraint(final_state[j] <= target_state[j])
+            mp.AddConstraint(final_state[j] >= target_state[j])
 
         # Time constraints
         total_time = num_time_steps * dt
@@ -214,7 +289,31 @@ class QuadrotorTrajectoryOptimization:
         return trajectory, input_trajectory, time_array
 
 
+import datetime
+import argparse
 if __name__ == "__main__":
+    # parse command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--filename",
+                        type=str,
+                        help="filename to save at",
+                        required=True)
+    args = parser.parse_args()
+
     quadrotor = QuadrotorTrajectoryOptimization()
-    traj, u_traj, time_array = quadrotor.compute_trajectory_to_pose()
+    # state_initial = np.zeros((12,))
+    # state_initial[0] = 1
+    state_initial = np.random.randn(12,)
+    traj, u_traj, time_array = quadrotor.compute_trajectory_to_pose(state_initial=state_initial)
     print(traj)
+    print(u_traj)
+    print(time_array)
+
+    # Save traj
+    # current_time = datetime.datetime.now()
+    # current_time = current_time.strftime("%y-%m-%d_%H_%M_%S")
+    filename = "traj/{}.npz".format(args.filename)
+    print("save to file: {}".format(filename))
+    file = open(filename, 'w+')
+
+    np.savez(file, traj, u_traj, time_array)
