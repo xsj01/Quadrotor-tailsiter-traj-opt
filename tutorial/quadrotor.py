@@ -165,7 +165,7 @@ class Quadrotor(LeafSystem):
         # Import the visual model
         self.mbp = MultibodyPlant()
         parser = Parser(self.mbp, scene_graph)
-        model_id = parser.AddModelFromFile(FindResourceOrThrow("drake/examples/quadrotor/quadrotor.urdf"),
+        model_id = parser.AddModelFromFile("quadrotor.urdf",
                                            "quadrotor")
         self.mbp.Finalize()
 
