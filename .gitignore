@@ -4,3 +4,5 @@
 # python cache
 *.pyc
 
+# Mac
+.DS_Store
