@@ -3,6 +3,11 @@
 import numpy as np
 from opt_math import RollPitchYaw, RotationMatrix
 
+from pydrake.forwarddiff import jacobian
+
+# import opt_math_autograd as ag
+# from autograd import grad
+
 
 def default_moment_of_inertia():
     return np.array([[0.0023, 0, 0],
@@ -29,6 +34,11 @@ class QuadrotorDynamics:
         :return: the the time derivative of the quadrotor state
         """
         # Calculate force exerted by each motor, expressed in Body frame
+        # if autograd:
+        #     np=ag.np
+        #     RollPitchYaw=ag.RollPitchYaw
+        #     RotationMatrix=ag.RotationMatrix
+
         uF_Bz = self.kF_ * u
 
         # Compute net force, expressed in body frame
@@ -76,7 +86,30 @@ class QuadrotorDynamics:
         # and derivative of vel by input, which is acceleration
         deriv = np.zeros_like(state)
         deriv[:6] = state[6:]
-        deriv[6:9] = xyzDDt.ravel()
+        print type(xyzDDt)
+        print type(xyzDDt[1,0])
+        #deriv[6:9] = xyzDDt.ravel()
+        deriv[6]=xyzDDt[0,0]
+        deriv[7]=xyzDDt[1,0]
+        deriv[8]=xyzDDt[2,0]
         for i in range(9, 12):
             deriv[i] = rpyDDt.ravel()[i-9][0]
         return deriv
+
+    def get_AB(self,state,u):
+        # np=ag.np
+        # #pf_px=
+        # state=np.array(state)
+        # u=np.array(u)
+        pf_px=jacobian(lambda state:self.dynamics(state, u), state)
+        #print self.dynamics(state, u)
+        pf_pu=jacobian(lambda u_:self.dynamics(state, u_), u)
+        return pf_px,pf_pu
+        #print pf_px
+        pass
+
+if __name__ == '__main__':
+    qd=QuadrotorDynamics()
+    state=np.ones(12,dtype=np.float64)
+    u=np.ones(4,dtype=np.float64)
+    print qd.get_AB(state,u)
