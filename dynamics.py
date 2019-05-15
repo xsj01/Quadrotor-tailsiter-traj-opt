@@ -90,7 +90,7 @@ class QuadrotorDynamics:
         # deriv[7]=xyzDDt[1,0]
         # deriv[6]=xyzDDt[0,0]
 
-        deriv[:6] = state[6:]
+        deriv[:6] = state[6:]+0*u[0]+0*u[1]+0*u[2]+0*u[3]
         #print type(xyzDDt)
         #print xyzDDt
         #deriv[6:9] = xyzDDt.ravel()
@@ -121,13 +121,13 @@ class QuadrotorDynamics:
         # u=np.array(u)
         pf_px=jacobian(lambda state:self.dynamics(state, u), state)
         #print self.dynamics(state, u)
-        #pf_pu=jacobian(lambda u_:self.dynamics(state, u_), u)
+        pf_pu=jacobian(lambda u_:self.dynamics(state, u_), u)
 
 
-        pf_pu=np.zeros((state.shape[0],u.shape[0]))
-        for i in range(state.shape[0]/2,state.shape[0]):
-            for j in range(u.shape[0]):
-                pf_pu[i,j]=derivative(lambda uj:xDi_uj(uj,i,j), u[j])
+        # pf_pu=np.zeros((state.shape[0],u.shape[0]))
+        # for i in range(state.shape[0]/2,state.shape[0]):
+        #     for j in range(u.shape[0]):
+        #         pf_pu[i,j]=derivative(lambda uj:xDi_uj(uj,i,j), u[j])
         return pf_px,pf_pu
         #print pf_px
         pass
