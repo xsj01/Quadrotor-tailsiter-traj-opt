@@ -306,8 +306,8 @@ class Tailsitter(LeafSystem):
         parser = Parser(self.mbp, scene_graph)
 
         dir_path = os.path.dirname(os.path.realpath(__file__))
-        model_id = parser.AddModelFromFile(dir_path + "/quadrotor.urdf",
-                                           "quadrotor")
+        model_id = parser.AddModelFromFile(dir_path + "/tailsitter.urdf",
+                                           "tailsitter")
         self.mbp.Finalize()
 
         # Get ids

@@ -116,7 +116,9 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     # Get filename and check for existence
-    filename = "traj/{}_{}.npz".format(args.filename, args.model)
+
+    dir_path = os.path.dirname(os.path.realpath(__file__))
+    filename = dir_path + "/traj/{}_{}.npz".format(args.filename, args.model)
     if os.path.exists(filename):
         raise Exception("{} already exists".format(filename))
 
