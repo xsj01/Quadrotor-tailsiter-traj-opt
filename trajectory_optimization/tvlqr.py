@@ -9,7 +9,7 @@ from pydrake.systems.controllers import LinearQuadraticRegulator
 from ..simulate.simulate import simulate
 
 from ..models.quadrotor import Quadrotor
-from ..autodiff.linearize import QuadrotorDynamicsLinearizer
+from ..autodiff.quadrotor_linearizer import QuadrotorDynamicsLinearizer
 from utilities import load_traj
 
 
