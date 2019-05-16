@@ -87,8 +87,7 @@ class TailsitterDynamicsLinearizer:
 
         v_2=R_1_to_2.dot(v_1)
 
-        alpha=np.arctan2(v_2[2],v_2[0])
-        beta=np.arcsin(v_2[0]/V)
+        
 
         #calculate Force Momentum in Frame 2
 
@@ -100,21 +99,31 @@ class TailsitterDynamicsLinearizer:
         M_propeller_2=np.array([Mx_2,My_2,Mz_2])
         F_propeller_2=np.array([Fx_2,0,0.])
 
-        L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
-        D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
-        Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
 
-        ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
-        m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
-        n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
+        if V==0:
+            alpha=0.
+            beta=0.
+            F_net_2=F_propeller_2
+            M_net_2=M_propeller_2
+        else:
+            alpha=np.arctan2(v_2[2],v_2[0])
+            beta=np.arcsin(v_2[0]/V)
 
-        DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+            L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
+            D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
+            Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
 
-        F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
-        M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
+            ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
+            m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
+            n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
 
-        F_net_2=F_propeller_2+F_aero_2
-        M_net_2=M_aero_2+M_propeller_2
+            DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+
+            F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
+            M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
+
+            F_net_2=F_propeller_2+F_aero_2
+            M_net_2=M_aero_2+M_propeller_2
 
 
         #Calculate Force Momentum in frame 0
@@ -223,6 +232,6 @@ class TailsitterDynamicsLinearizer:
 
 if __name__ == '__main__':
     linearizer= TailsitterDynamicsLinearizer()
-    state = np.ones(12, dtype=np.float64)
+    state = np.zeros(12, dtype=np.float64)
     u = np.ones(4,dtype=np.float64)
     print linearizer.get_AB(state,u)

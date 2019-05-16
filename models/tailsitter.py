@@ -165,8 +165,6 @@ class Tailsitter(LeafSystem):
 
         v_2=R_1_to_2.dot(v_1)
 
-        alpha=np.arctan2(v_2[2],v_2[0])
-        beta=np.arcsin(v_2[0]/V)
 
         #calculate Force Momentum in Frame 2
 
@@ -178,21 +176,30 @@ class Tailsitter(LeafSystem):
         M_propeller_2=np.array([Mx_2,My_2,Mz_2])
         F_propeller_2=np.array([Fx_2,0,0.])
 
-        L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
-        D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
-        Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
+        if V==0:
+            alpha=0.
+            beta=0.
+            F_net_2=F_propeller_2
+            M_net_2=M_propeller_2
+        else:
+            alpha=np.arctan2(v_2[2],v_2[0])
+            beta=np.arcsin(v_2[0]/V)
 
-        ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
-        m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
-        n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
+            L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
+            D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
+            Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
 
-        DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+            ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
+            m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
+            n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
 
-        F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
-        M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
+            DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
 
-        F_net_2=F_propeller_2+F_aero_2
-        M_net_2=M_aero_2+M_propeller_2
+            F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
+            M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
+
+            F_net_2=F_propeller_2+F_aero_2
+            M_net_2=M_aero_2+M_propeller_2
 
 
         #Calculate Force Momentum in frame 0
@@ -309,7 +316,10 @@ class Tailsitter(LeafSystem):
         return self.source_id_
 
     def cal_alpha_beta_u_by_V(self,desired_V):
-        
+        V=np.linalg.norm(desired_V)
+
+        if V==0:
+            return 0,0,self.m_*self.g_/4*np.ones(4)/cos(ts.delta),np.array([0.,0.,0.])
 
 
         mp = MathematicalProgram()
@@ -337,7 +347,7 @@ class Tailsitter(LeafSystem):
         #F_gravity_2=R_b_to_2.dot(R_v_to_b).dot(F_gravity_v)
         F_gravity_2=R_0_to_2.dot(F_gravity_0)
 
-        V=np.linalg.norm(desired_V)
+
 
         L_aero_2=0.5*self.rho*V**2*self.S*dd.get_CL(alpha,beta)[0,0]
         D_aero_2=0.5*self.rho*V**2*self.S*dd.get_CD(alpha,beta)[0,0]
@@ -488,7 +498,7 @@ if __name__ == "__main__":
 
     # Add controller
     # controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
-    v=np.array([2.,0.,0.])
+    v=np.array([0.,0.,0.])
     ts=Tailsitter()
     _,_,u,rpy=ts.cal_alpha_beta_u_by_V(v)
     print u,rpy
