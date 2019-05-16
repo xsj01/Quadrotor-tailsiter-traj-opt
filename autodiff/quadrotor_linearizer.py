@@ -113,6 +113,6 @@ class QuadrotorDynamicsLinearizer:
 
 if __name__ == '__main__':
     linearizer= QuadrotorDynamicsLinearizer()
-    state = np.ones(12, dtype=np.float64)
+    state = np.zeros(12, dtype=np.float64)
     u = np.ones(4,dtype=np.float64)
     print linearizer.get_AB(state,u)
