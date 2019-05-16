@@ -219,7 +219,7 @@ class Tailsitter(LeafSystem):
         return F_net_1.reshape((-1,1)),M_net_1.reshape((-1,1))
 
 
-    def DoCalcTimeDerivatives(self, context, derivatives):
+    def DoCalcTimeDerivatives(self, context, derivatives, beta0=0.):
         """ Function that gets called to obtain derivatives, for simulation
         :param context: context for performing calculations
         :param derivatives: derivatives of the system to be set at current state
@@ -321,7 +321,7 @@ class Tailsitter(LeafSystem):
         V=np.linalg.norm(desired_V)
 
         if V==0:
-            return 0,0,self.m_*self.g_/4*np.ones(4)/cos(ts.delta),np.array([0.,0.,0.])
+            return 0,0,self.m_*self.g_/4*np.ones(4)/cos(self.delta),np.array([0.,0.,0.])
 
 
         mp = MathematicalProgram()
@@ -500,7 +500,7 @@ if __name__ == "__main__":
 
     # Add controller
     # controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
-    v=np.array([0.,0.,2.])
+    v=np.array([2.,0.,0.])
     ts=Tailsitter()
     _,_,u,rpy=ts.cal_alpha_beta_u_by_V(v)
     print u,rpy
@@ -529,7 +529,7 @@ if __name__ == "__main__":
 
     # Simulate the system
     simulator = Simulator(diagram)
-    simulator.set_target_realtime_rate(0.1)
+    simulator.set_target_realtime_rate(1.)
     context = simulator.get_mutable_context()
 
     for i in range(args.trials):
