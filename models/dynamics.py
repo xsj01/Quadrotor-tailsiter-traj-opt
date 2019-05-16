@@ -1,4 +1,5 @@
 # -*- coding: utf8 -*-
+import os
 import numpy as np
 from numpy import exp,cos,sin,deg2rad,pi,sign
 import math
@@ -12,8 +13,9 @@ import scipy.io as scio
 
 # def abs(x):
 #     return sign(x)*x
- 
-dataFile = './aero_reg_coeff.mat'
+
+dir_path = os.path.dirname(os.path.realpath(__file__))
+dataFile = dir_path + '/aero_reg_coeff.mat'
 data = scio.loadmat(dataFile)
 aero_reg_coeff=data['aero_reg_coeff'][0]
 #print aero_reg_coeff[1]

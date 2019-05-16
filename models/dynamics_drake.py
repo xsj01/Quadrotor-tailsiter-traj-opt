@@ -1,4 +1,5 @@
 # -*- coding: utf8 -*-
+import os
 import numpy as np
 from numpy import exp,cos,sin,deg2rad,pi,sign
 from pydrake.math import sin, cos,exp,abs,sqrt
@@ -21,8 +22,8 @@ def abs(x):
 
 #print type(cos)
 
- 
-dataFile = './aero_reg_coeff.mat'
+dir_path = os.path.dirname(os.path.realpath(__file__))
+dataFile = dir_path + '/aero_reg_coeff.mat'
 data = scio.loadmat(dataFile)
 aero_reg_coeff=data['aero_reg_coeff'][0]
 #print aero_reg_coeff[1]

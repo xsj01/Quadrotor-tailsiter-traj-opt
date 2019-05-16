@@ -38,8 +38,8 @@ def rot_mat(theta,axis,autodiff=False):
                         [0,0,1.]])
 
 
-class QuadrotorDynamicsLinearizer:
-    """ Linearizer for obtaining the linearized quadrotor system around a nominal point
+class TailsitterDynamicsLinearizer:
+    """ Linearizer for obtaining the linearized tailsitter system around a nominal point
     """
     def __init__(self, m_arg=0.5, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):
         # Set model constants
@@ -222,7 +222,7 @@ class QuadrotorDynamicsLinearizer:
         return pf_px,pf_pu
 
 if __name__ == '__main__':
-    linearizer= QuadrotorDynamicsLinearizer()
+    linearizer= TailsitterDynamicsLinearizer()
     state = np.ones(12, dtype=np.float64)
     u = np.ones(4,dtype=np.float64)
     print linearizer.get_AB(state,u)

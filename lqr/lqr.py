@@ -7,7 +7,9 @@ from pydrake.all import (MeshcatVisualizer, DiagramBuilder, SceneGraph, Multibod
 from pydrake.systems.controllers import LinearQuadraticRegulator
 
 from ..models.quadrotor import Quadrotor
+from ..models.tailsitter import Tailsitter
 from ..autodiff.quadrotor_linearizer import QuadrotorDynamicsLinearizer
+from ..autodiff.tailsitter_linearizer import TailsitterDynamicsLinearizer
 from ..simulate.simulate import simulate
 
 
@@ -74,7 +76,7 @@ if __name__ == "__main__":
                         help="Duration to run each sim.",
                         default=5.0)
     parser.add_argument("-M", "--model",
-                        type=float,
+                        type=str,
                         help="Select the model to run",
                         default="quadrotor")
     MeshcatVisualizer.add_argparse_argument(parser)
@@ -82,11 +84,14 @@ if __name__ == "__main__":
 
     if args.model == "quadrotor":
         plant = Quadrotor()
+        linearizer = QuadrotorDynamicsLinearizer()
     else:
-        plant =
-    controller = LQRController(plant=plant, dynamics_linearizer=QuadrotorDynamicsLinearizer(), target_pos=[0, 0, 1])
+        plant = Tailsitter()
+        linearizer = TailsitterDynamicsLinearizer()
+    controller = LQRController(plant=plant, dynamics_linearizer=linearizer, target_pos=[0, 0, 1])
 
     def initial_state_gen():
+        return np.zeros((12, ))
         return np.random.randn(12,)
 
     # Display in meshcat
