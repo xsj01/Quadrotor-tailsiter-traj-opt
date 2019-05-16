@@ -91,7 +91,7 @@ if __name__ == "__main__":
     controller = LQRController(plant=plant, dynamics_linearizer=linearizer, target_pos=[0, 0, 1])
 
     def initial_state_gen():
-        return np.zeros((12, ))
+        # return np.zeros((12, ))
         return np.random.randn(12,)
 
     # Display in meshcat
