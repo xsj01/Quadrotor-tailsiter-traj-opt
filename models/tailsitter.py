@@ -219,7 +219,7 @@ class Tailsitter(LeafSystem):
         return F_net_1.reshape((-1,1)),M_net_1.reshape((-1,1))
 
 
-    def DoCalcTimeDerivatives(self, context, derivatives, beta0=0.):
+    def DoCalcTimeDerivatives(self, context, derivatives):
         """ Function that gets called to obtain derivatives, for simulation
         :param context: context for performing calculations
         :param derivatives: derivatives of the system to be set at current state
@@ -317,7 +317,7 @@ class Tailsitter(LeafSystem):
     def source_id(self):
         return self.source_id_
 
-    def cal_alpha_beta_u_by_V(self,desired_V):
+    def cal_alpha_beta_u_by_V(self,desired_V, beta0=0.):
         V=np.linalg.norm(desired_V)
 
         if V==0:
@@ -369,7 +369,7 @@ class Tailsitter(LeafSystem):
 
         mp.AddConstraint(F_gravity_2[1]+F_aero_2[1]==0)
         mp.AddConstraint(F_gravity_2[2]+F_aero_2[2]==0)
-        mp.AddConstraint(beta==0.)
+        mp.AddConstraint(beta==beta0)
 
         #mp.AddLinearConstraint(alpha>=-deg2rad(30))
         #mp.AddQuadraticCost(Q)
@@ -440,7 +440,174 @@ class Tailsitter(LeafSystem):
         rpy=RollPitchYaw(R_1_to_0)#.SetFromRotationMatrix(R_1_to_0)
     
         #print
-        return alpha,beta,u,[rpy.roll_angle(),rpy.pitch_angle(),rpy.yaw_angle()]    
+        return alpha,beta,u,[rpy.roll_angle(),rpy.pitch_angle(),rpy.yaw_angle()]  
+
+    def cal_optimal_transpoet(self,desired_V):
+        V=np.linalg.norm(desired_V)
+
+        if V==0:
+            return 0,0,self.m_*self.g_/4*np.ones(4)/cos(self.delta),np.array([0.,0.,0.])
+
+
+        mp = MathematicalProgram()
+        alpha=mp.NewContinuousVariables(1, "alpha")[0]
+        beta=mp.NewContinuousVariables(1, "beta")[0]
+        theta2=mp.NewContinuousVariables(1, "theta")[0]
+        u=mp.NewContinuousVariables(4, "u")
+
+        theta1=np.arctan2(desired_V[1],desired_V[0])
+        theta0=np.arctan2(desired_V[2],np.linalg.norm(desired_V[0:2]))
+        #print theta
+
+        R_v_to_b=np.array([[dd.cos(beta),-dd.sin(beta),0],
+                            [dd.sin(beta),dd.cos(beta),0],
+                            [0,0,1.]])
+        R_b_to_2=np.array([[dd.cos(alpha),0,-dd.sin(alpha)],
+                            [0,1,0],
+                            [dd.sin(alpha),0,dd.cos(alpha)]])
+
+        R_0_to_v=rot_mat(theta2,0,autodiff=True).dot(rot_mat(-np.pi,0)).dot(rot_mat(theta0,1)).dot(rot_mat(-theta1,2))
+
+        R_0_to_2=R_b_to_2.dot(R_v_to_b).dot(R_0_to_v)
+        #F_gravity_v=np.array([-sin(theta0),0.,cos(theta0)])*self.m_*self.g_
+        F_gravity_0=np.array([0,0,-1.])*self.m_*self.g_
+        #f1=self.m_*self.g_*dd.sin(alpha+theta)
+        #F_gravity_2=R_b_to_2.dot(R_v_to_b).dot(F_gravity_v)
+        F_gravity_2=R_0_to_2.dot(F_gravity_0)
+
+
+
+        L_aero_2=0.5*self.rho*V**2*self.S*dd.get_CL(alpha,beta)[0,0]
+        D_aero_2=0.5*self.rho*V**2*self.S*dd.get_CD(alpha,beta)[0,0]
+        Y_aero_2=0.5*self.rho*V**2*self.S*dd.get_CY(alpha,beta)[0,0]
+
+        F_aero_2=np.array([[-dd.cos(alpha),0,dd.sin(alpha)],
+                            [0,1,0],
+                            [-dd.sin(alpha),0,-dd.cos(alpha)]]).dot([D_aero_2,Y_aero_2,L_aero_2])
+
+        # f2=L_aero_2*dd.cos(alpha)+D_aero_2*dd.sin(alpha)
+
+        # Q1=(f1-f2)**2
+
+        ll_aero_2=0.5*self.rho*V**2*self.c*self.S*dd.get_Cll(alpha,beta)[0,0]
+        m_aero_2=0.5*self.rho*V**2*self.c*self.S*dd.get_Cm(alpha,beta)[0,0]
+        n_aero_2=0.5*self.rho*V**2*self.c*self.S*dd.get_Cn(alpha,beta)[0,0]
+
+        DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+
+        F_aero_2=np.array([[-dd.cos(alpha),0,dd.sin(alpha)],[0,1,0],[-dd.sin(alpha),0,-dd.cos(alpha)]]).dot(DYL)
+
+        #F_gravity_2
+
+        FM_aero=np.array([[1,1,1,1],[-1,1,-1,1],[1,1,-1,-1.],[-1,1,1,-1.]]).dot(u)
+        Fx_2=FM_aero[0]*cos(self.delta)
+        Mx_2=FM_aero[1]*(sin(self.delta)*self.d+self.kappa*cos(self.delta))
+        My_2=FM_aero[2]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*sin(self.chi)
+        Mz_2=FM_aero[3]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*cos(self.chi)
+        M_propeller_2=np.array([Mx_2,My_2,Mz_2])
+        F_propeller_2=np.array([Fx_2,0,0.])
+
+        # FM0=-(F_aero_2[0]+F_gravity_2[0])/cos(self.delta)
+        # FM1=-ll_aero_2/(sin(self.delta)*self.d+self.kappa*cos(self.delta))
+        # FM2=-m_aero_2/(cos(self.delta)*self.d-self.kappa*sin(self.delta))/sin(self.chi)
+        # FM3=-n_aero_2/(cos(self.delta)*self.d-self.kappa*sin(self.delta))/cos(self.chi)
+        # # Fx_2=FM_aero[0]*cos(self.delta)
+        # # Mx_2=FM_aero[1]*(sin(self.delta)*self.d+self.kappa*cos(self.delta))
+        # # My_2=FM_aero[2]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*sin(self.chi)
+        # # Mz_2=FM_aero[3]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*cos(self.chi)
+        # FM=np.array([FM0,FM1,FM2,FM3])
+
+        # u0=np.linalg.inv(np.array([[1,1,1,1],[-1,1,-1,1],[1,1,-1,-1.],[-1,1,1,-1.]])).dot(FM)
+
+        
+        # for i in range(4):
+        #     mp.AddConstraint(u0[i]-u[i]<=1e-3)
+        #     mp.AddConstraint(u0[i]-u[i]>=-1e-3)
+            
+        # mp.AddConstraint(Q1==0)
+        # mp.AddConstraint(Y_aero_2**2==0)
+        mp.AddConstraint(Fx_2+F_aero_2[0]==0)
+        mp.AddConstraint(F_gravity_2[1]+F_aero_2[1]==0)
+        mp.AddConstraint(F_gravity_2[2]+F_aero_2[2]==0)
+        mp.AddConstraint(Mx_2+ll_aero_2==0)
+        mp.AddConstraint(My_2+m_aero_2==0)
+        mp.AddConstraint(Mz_2+n_aero_2==0)
+
+        #mp.AddLinearConstraint(beta==0.4)
+        # mp.AddLinearConstraint(beta<=np.pi/2)
+        # mp.AddLinearConstraint(beta>=-np.pi/2)
+        for i in range(4):
+            mp.AddQuadraticCost(u[i]**2)
+        #mp.AddLinearConstraint(alpha>=-deg2rad(30))
+        #mp.AddQuadraticCost(Q)
+        result = Solve(mp)
+        alpha=result.GetSolution(alpha)
+        beta=result.GetSolution(beta)
+        theta2=result.GetSolution(theta2)
+
+        print alpha,beta,theta2
+        #F_gravity_2x=result.GetSolution(F_gravity_2[0])
+        #print [F_gravity_2x]
+        print result.is_success()
+        # print get_CL(alpha,0.)
+        # print get_CD(alpha,0.)
+        #R_0_to_v=rot_mat(theta2,0).dot(rot_mat(theta0,1)).dot(rot_mat(-theta1,2))
+        R_v_to_b=np.array([[dd.cos(beta),-dd.sin(beta),0],
+                            [dd.sin(beta),dd.cos(beta),0],
+                            [0,0,1.]])
+        R_b_to_2=np.array([[dd.cos(alpha),0,-dd.sin(alpha)],
+                            [0,1,0],
+                            [dd.sin(alpha),0,dd.cos(alpha)]])
+
+        R_0_to_v=rot_mat(theta2,0).dot(rot_mat(-np.pi,0)).dot(rot_mat(theta0,1)).dot(rot_mat(-theta1,2))
+
+        R_0_to_2=R_b_to_2.dot(R_v_to_b).dot(R_0_to_v)
+        #F_gravity_v=np.array([-sin(theta0),0.,cos(theta0)])*self.m_*self.g_
+        F_gravity_0=np.array([0,0,-1.])*self.m_*self.g_
+        #f1=self.m_*self.g_*dd.sin(alpha+theta)
+        #F_gravity_2=R_b_to_2.dot(R_v_to_b).dot(F_gravity_v)
+        F_gravity_2=R_0_to_2.dot(F_gravity_0)
+
+
+        L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
+        D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
+        Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
+
+        ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
+        m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
+        n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
+
+        DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+
+        F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
+
+        #F_gravity_2
+
+        FM0=-(F_aero_2[0]+F_gravity_2[0])/cos(self.delta)
+        FM1=-ll_aero_2/(sin(self.delta)*self.d+self.kappa*cos(self.delta))
+        FM2=-m_aero_2/(cos(self.delta)*self.d-self.kappa*sin(self.delta))/sin(self.chi)
+        FM3=-n_aero_2/(cos(self.delta)*self.d-self.kappa*sin(self.delta))/cos(self.chi)
+        # Fx_2=FM_aero[0]*cos(self.delta)
+        # Mx_2=FM_aero[1]*(sin(self.delta)*self.d+self.kappa*cos(self.delta))
+        # My_2=FM_aero[2]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*sin(self.chi)
+        # Mz_2=FM_aero[3]*(cos(self.delta)*self.d-self.kappa*sin(self.delta))*cos(self.chi)
+        FM=np.array([FM0,FM1,FM2,FM3])
+
+        u=np.linalg.inv(np.array([[1,1,1,1],[-1,1,-1,1],[1,1,-1,-1.],[-1,1,1,-1.]])).dot(FM)
+
+        #rpy 
+        
+        R_1_to_2=np.array([[0,0,1],[cos(self.chi),-sin(self.chi),0],[sin(self.chi),cos(self.chi),0]])
+        R_2_to_1=R_1_to_2.T
+
+        R_1_to_0=R_0_to_2.T.dot(R_1_to_2)
+
+        print R_1_to_0
+
+        rpy=RollPitchYaw(R_1_to_0)#.SetFromRotationMatrix(R_1_to_0)
+        
+        #print
+        return alpha,beta,u,[rpy.roll_angle(),rpy.pitch_angle(),rpy.yaw_angle()]   
 
     #def cal_rpy(alpha,beta,V)
 # def LQRController(quadrotor, nominal_position=(0, 0, 1)):
@@ -502,7 +669,7 @@ if __name__ == "__main__":
     # controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
     v=np.array([2.,0.,0.])
     ts=Tailsitter()
-    _,_,u,rpy=ts.cal_alpha_beta_u_by_V(v)
+    _,_,u,rpy=ts.cal_optimal_transpoet(v)
     print u,rpy
     initial_state=np.zeros(12)
     initial_state[2]=1.
