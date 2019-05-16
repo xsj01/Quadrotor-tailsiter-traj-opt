@@ -2,6 +2,7 @@
 # Implement quadrotor model in python
 
 import argparse
+import os
 import numpy as np
 
 from pydrake.common import FindResourceOrThrow
@@ -165,7 +166,9 @@ class Quadrotor(LeafSystem):
         # Import the visual model
         self.mbp = MultibodyPlant()
         parser = Parser(self.mbp, scene_graph)
-        model_id = parser.AddModelFromFile("quadrotor.urdf",
+
+        dir_path = os.path.dirname(os.path.realpath(__file__))
+        model_id = parser.AddModelFromFile(dir_path + "/quadrotor.urdf",
                                            "quadrotor")
         self.mbp.Finalize()
 

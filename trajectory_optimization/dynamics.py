@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 # Contains quadrotor dynamics implementation
 import numpy as np
-from opt_math import RollPitchYaw, RotationMatrix
+from ..math.opt_math import RollPitchYaw, RotationMatrix
 
 
 def default_moment_of_inertia():

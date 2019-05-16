@@ -13,7 +13,7 @@ def default_moment_of_inertia():
 
 
 class QuadrotorDynamicsLinearizer:
-    """ Implement quadrotor dynamics for trajectory optimization
+    """ Linearizer for obtaining the linearized quadrotor system around a nominal point
     """
     def __init__(self, m_arg=0.5, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):
         # Set model constants
