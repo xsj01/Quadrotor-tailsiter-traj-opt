@@ -133,7 +133,7 @@ if __name__ == "__main__":
     initial_state = np.zeros((12,))
     initial_state[1] = 0
     target_state = np.zeros((12,))
-    target_state[2] = 1
+    target_state[2] = 3
     traj, u_traj, time_array = dir_trans.compute_trajectory(initial_state=initial_state)
 
     # Save traj
