@@ -29,14 +29,14 @@
       <material name="white" />
     </visual>
     <visual>
-      <origin rpy="0 0 0.785" xyz="0 0 -0.05" />
+      <origin rpy="0 0 2.356" xyz="0 0 -0.05" />
       <geometry>
         <box size="0.03 0.6 0.2" />
       </geometry>
       <material name="black" />
     </visual>
     <visual>
-      <origin rpy="0 0 0.785" xyz="0 0 0" />
+      <origin rpy="0 0 2.356" xyz="0 0 0" />
       <geometry>
         <box size="0.03 0.2 0.3" />
       </geometry>
