@@ -88,8 +88,7 @@ class Quadrotor(LeafSystem):
 
         # Convert roll-pitch-yaw to quaternion
         quaternion_wxyz = RollPitchYaw(state[3:6]).ToQuaternion().wxyz()
-        out[:3] = quaternion_wxyz[1:]
-        out[3] = quaternion_wxyz[0]
+        out[:4] = quaternion_wxyz[::-1]
 
         # set x and z pos
         out[4:] = state[:3]

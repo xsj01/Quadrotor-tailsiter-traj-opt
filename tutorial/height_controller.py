@@ -105,7 +105,9 @@ if __name__ == "__main__":
 
     for i in range(args.trials):
         context.set_time(0.)
-        context.SetContinuousState(np.zeros(shape=(12,)))
+        initial_state = np.zeros(shape=(12,))
+        initial_state[5] = 0.7
+        context.SetContinuousState(initial_state)
         simulator.Initialize()
         simulator.StepTo(args.duration)
 

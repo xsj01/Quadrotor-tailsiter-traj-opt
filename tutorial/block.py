@@ -22,12 +22,12 @@ class Block(LeafSystem):
         LeafSystem.__init__(self)
 
         # Declare inputs to the model.
-        # In this case, it is acceleration command
+        # (In this case, it is acceleration command) not used
         self.DeclareVectorInputPort(name="x", model_vector=BasicVector(1))
 
         # Declare state vector of the model
-        # Here we have x pos, and x vel
-        self.DeclareContinuousState(model_vector=BasicVector(np.zeros(2)), num_q=1, num_v=1, num_z=0)
+        # Here we have x, y, z, roll, pitch, yaw and their derivatives
+        self.DeclareContinuousState(model_vector=BasicVector(np.zeros(12)), num_q=6, num_v=6, num_z=0)
 
         # Output geometry state
         # To be fed through MultibodyPositionToGeometryPose to meshcat
@@ -43,16 +43,18 @@ class Block(LeafSystem):
         :param context: context for performing calculations
         :param output: output to be set
         """
-        # Obtain current state
-        x = context.get_continuous_state_vector().CopyToVector()
-
-        # Identity quaternion
         out = np.zeros((7,))
-        out[3] = 1
+
+        # Obtain current state
+        state = context.get_continuous_state_vector().CopyToVector()
+
+        # Convert roll-pitch-yaw to quaternion
+        quaternion_wxyz = RollPitchYaw(state[3:6]).ToQuaternion().wxyz()
+        out[:3] = quaternion_wxyz[1:]
+        out[3] = quaternion_wxyz[0]
 
         # set x and z pos
-        out[4] = x[0]
-        out[6] = 1
+        out[4:] = state[:3]
 
         # Send output
         output.SetFromVector(out)
@@ -62,15 +64,11 @@ class Block(LeafSystem):
         :param context: context for performing calculations
         :param derivatives: derivatives of the system to be set at current state
         """
-        # Get current state
-        x = context.get_continuous_state_vector().CopyToVector()
-
-        # Get input
-        u = self.EvalVectorInput(context, 0).GetAtIndex(0)
+        deriv = np.zeros((12,))
 
         # Set derivative of pos by current velocity,
         # and derivative of vel by input, which is acceleration
-        derivatives.get_mutable_vector().SetFromVector([x[1], u])
+        derivatives.get_mutable_vector().SetFromVector(deriv)
 
     def RegisterGeometry(self, scene_graph):
         """ Create the visual model of the system, and register in scene graph
@@ -135,7 +133,8 @@ context = simulator.get_mutable_context()
 
 for i in range(args.trials):
     context.set_time(0.)
-    # context.SetContinuousState(np.random.randn(2,))
-    context.SetContinuousState(np.zeros(2,))
+    initial_state = np.zeros((12,))
+    initial_state[3] = 0.7
+    context.SetContinuousState(initial_state)
     simulator.Initialize()
     simulator.StepTo(args.duration)
