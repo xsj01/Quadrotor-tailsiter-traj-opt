@@ -100,30 +100,32 @@ class TailsitterDynamics:
         F_propeller_2=np.array([Fx_2,0,0.])
 
 
-        if V==0:
-            alpha=0.
-            beta=0.
-            F_net_2=F_propeller_2
-            M_net_2=M_propeller_2
-        else:
-            alpha=np.arctan2(v_2[2],v_2[0])
-            beta=np.arcsin(v_2[0]/V)
+        # if V==0:
+        #     alpha=0.
+        #     beta=0.
+        #     F_net_2=F_propeller_2
+        #     M_net_2=M_propeller_2
+        # else:
+        alpha=atan2(v_2[2],v_2[0])
+        vxy=np.linalg.norm(v_2[0::2])
+        #beta=arcsin(v_2[0]/V)
+        beta=atan2(v_2[1],vxy)
 
-            L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
-            D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
-            Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
+        L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
+        D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)
+        Y_aero_2=0.5*self.rho*V**2*self.S*get_CY(alpha,beta)
 
-            ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
-            m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
-            n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
+        ll_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cll(alpha,beta)
+        m_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cm(alpha,beta)
+        n_aero_2=0.5*self.rho*V**2*self.c*self.S*get_Cn(alpha,beta)
 
-            DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
+        DYL=np.array([D_aero_2,Y_aero_2,L_aero_2]).reshape(-1)
 
-            F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
-            M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
+        F_aero_2=np.array([[-cos(alpha),0,sin(alpha)],[0,1,0],[-sin(alpha),0,-cos(alpha)]]).dot(DYL)
+        M_aero_2=np.array([ll_aero_2,m_aero_2,n_aero_2]).reshape(-1)
 
-            F_net_2=F_propeller_2+F_aero_2
-            M_net_2=M_aero_2+M_propeller_2
+        F_net_2=F_propeller_2+F_aero_2
+        M_net_2=M_aero_2+M_propeller_2
 
 
         #Calculate Force Momentum in frame 0

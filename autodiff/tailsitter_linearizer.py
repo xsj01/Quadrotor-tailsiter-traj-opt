@@ -106,8 +106,10 @@ class TailsitterDynamicsLinearizer:
             F_net_2=F_propeller_2
             M_net_2=M_propeller_2
         else:
-            alpha=np.arctan2(v_2[2],v_2[0])
-            beta=np.arcsin(v_2[0]/V)
+            alpha=atan2(v_2[2],v_2[0])
+            #vxy=np.linalg.norm(v_2[0::2])
+            beta=asin(v_2[1]/V)
+            #beta=atan2(v_2[1],vxy)
 
             L_aero_2=0.5*self.rho*V**2*self.S*get_CL(alpha,beta)
             D_aero_2=0.5*self.rho*V**2*self.S*get_CD(alpha,beta)

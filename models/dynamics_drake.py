@@ -2,7 +2,7 @@
 import os
 import numpy as np
 from numpy import exp,cos,sin,deg2rad,pi,sign
-from pydrake.math import sin, cos,exp,abs,sqrt
+from pydrake.math import sin, cos,exp,abs,sqrt,atan2,asin
 
 import math
 
