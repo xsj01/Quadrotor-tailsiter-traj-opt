@@ -14,7 +14,7 @@ from utilities import load_traj
 
 
 class TVLQR(VectorSystem):
-    """ Quadrotor controller that uses time-varying LQR around nominal trajectory
+    """ controller that uses time-varying LQR around nominal trajectory
     """
     def __init__(self, filename):
         """
@@ -84,6 +84,10 @@ if __name__ == "__main__":
                         type=int,
                         help="Number of trials to run.",
                         default=5)
+    parser.add_argument("-M", "--model",
+                        type=str,
+                        help="Select the model to run",
+                        default="quadrotor")
     MeshcatVisualizer.add_argparse_argument(parser)
     args = parser.parse_args()
 

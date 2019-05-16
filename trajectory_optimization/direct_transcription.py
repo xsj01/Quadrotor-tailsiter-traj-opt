@@ -5,6 +5,7 @@ import numpy as np
 from pydrake.solvers.mathematicalprogram import MathematicalProgram, Solve
 
 from dynamics import QuadrotorDynamics
+from tailsitter_dynamics import TailsitterDynamics
 from utilities import save_traj
 
 
@@ -108,22 +109,29 @@ if __name__ == "__main__":
                         type=str,
                         help="filename to save at",
                         required=True)
+    parser.add_argument("-M", "--model",
+                        type=str,
+                        help="Select the model to run",
+                        default="quadrotor")
     args = parser.parse_args()
 
     # Get filename and check for existence
-    filename = "traj/{}.npz".format(args.filename)
+    filename = "traj/{}_{}.npz".format(args.filename, args.model)
     if os.path.exists(filename):
         raise Exception("{} already exists".format(filename))
 
     # Set up direct transcription problem
-    quadrotor_model = QuadrotorDynamics()
-    dir_trans = DirectTranscription(dynamics_model=quadrotor_model)
+    if args.model == "quadrotor":
+        dynamics_model = QuadrotorDynamics()
+    else:
+        dynamics_model = TailsitterDynamics()
+    dir_trans = DirectTranscription(dynamics_model=dynamics_model)
 
     # Compute trajectory from initial state to final state
     initial_state = np.zeros((12,))
-    initial_state[1] = 1
+    initial_state[1] = 0
     target_state = np.zeros((12,))
-    target_state[2] = 3
+    target_state[2] = 1
     traj, u_traj, time_array = dir_trans.compute_trajectory(initial_state=initial_state)
 
     # Save traj

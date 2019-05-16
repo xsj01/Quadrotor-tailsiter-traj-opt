@@ -38,7 +38,7 @@ def rot_mat(theta,axis,autodiff=False):
                         [0,0,1.]])
 
 
-class TailsitterDynamicsLinearizer:
+class TailsitterDynamics:
     """ Linearizer for obtaining the linearized tailsitter system around a nominal point
     """
     def __init__(self, m_arg=0.5, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):

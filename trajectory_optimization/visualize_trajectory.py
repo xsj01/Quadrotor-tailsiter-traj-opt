@@ -16,11 +16,15 @@ from pydrake.all import LeafSystem, BasicVector
 from utilities import load_traj
 
 
-class PuppetQuadrotor(LeafSystem):
+class PuppetPlant(LeafSystem):
     """ A system purely for visualizing trajectory
         Does not implement dynamics
     """
-    def __init__(self, filename):
+    def __init__(self, filename, model_name):
+        """
+        :param filename: trajectory file name
+        :param model_name: model name, e.g. "quadrotor" or "tailsitter"
+        """
         LeafSystem.__init__(self)
 
         # Output geometry state
@@ -34,6 +38,7 @@ class PuppetQuadrotor(LeafSystem):
 
         self.traj, self.u_traj, self.time_array = load_traj(filename)
         self.final_time = self.time_array[-1][0]
+        self.model_name = model_name
 
     def CopyPositionOut(self, context, output):
         """ Function for obtaining current geometry state, for visualization
@@ -64,7 +69,11 @@ class PuppetQuadrotor(LeafSystem):
         # Import the visual model
         self.mbp = MultibodyPlant()
         parser = Parser(self.mbp, scene_graph)
-        model_id = parser.AddModelFromFile(FindResourceOrThrow("drake/examples/quadrotor/quadrotor.urdf"),
+        if self.model_name == "quadrotor":
+            urdf_path = "drake/examples/quadrotor/quadrotor.urdf"
+        else:
+            urdf_path = "drake/examples/quadrotor/quadrotor.urdf"
+        model_id = parser.AddModelFromFile(FindResourceOrThrow(urdf_path),
                                            "quadrotor")
         self.mbp.Finalize()
 
@@ -121,13 +130,17 @@ if __name__ == "__main__":
                         type=int,
                         help="Number of trials to run.",
                         default=5)
+    parser.add_argument("-M", "--model",
+                        type=str,
+                        help="Select the model to run",
+                        default="quadrotor")
     MeshcatVisualizer.add_argparse_argument(parser)
     args = parser.parse_args()
 
     # Load quadrotor trajectory, and set duration of simulation
-    filename = "traj/{}.npz".format(args.filename)
-    puppet_quadrotor = PuppetQuadrotor(filename)
-    args.duration = puppet_quadrotor.final_time
+    filename = "traj/{}_{}.npz".format(args.filename, args.model)
+    puppet_plant = PuppetPlant(filename, model_name=args.model)
+    args.duration = puppet_plant.final_time
 
     # Display in meshcat
-    visualize(args, plant=puppet_quadrotor)
+    visualize(args, plant=puppet_plant)
