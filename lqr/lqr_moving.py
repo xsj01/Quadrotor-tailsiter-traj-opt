@@ -28,20 +28,24 @@ class StableStateController(VectorSystem):
         v=target_state[6:9]
         _,_,target_u,rpy=plant.cal_alpha_beta_u_by_V(v)
         target_state[3:6]=rpy[:]
+        self.rpy=rpy[:]
         self.target_u=target_u
 
-    def get_output(self,current_state,Q=None,R=None):
+    def get_output(self,current_state,Q=None,R=None, return_KS=False):
         target_state=self.target_state
         # nominal input for stable point
         #u0 = np.ones(shape=(4,))*self.plant.m_ * self.plant.g_ / 4
+
+
+
         u0=self.target_u
         ctrl_indx=self.ctrl_indx
         # linearize around nominal point
         A, B = self.dynamics_linearizer.get_AB(target_state,u0)
 
-        if not Q:
+        if Q is None:
             Q = np.identity(12)
-            Q[:6, :6] = 10*np.identity(6)
+            Q[:6, :6] = 50*np.identity(6)
 
         Q=Q[ctrl_indx,:]
         Q=Q[:,ctrl_indx]
@@ -51,8 +55,8 @@ class StableStateController(VectorSystem):
 
         B=B[ctrl_indx,:]
 
-        if not R:
-            R = np.identity(4)
+        if R is None:
+            R = np.identity(4)*10
 
         K, S = LinearQuadraticRegulator(A, B, Q, R)
 
@@ -63,6 +67,22 @@ class StableStateController(VectorSystem):
         u_bar = -np.matmul(K, x_bar).reshape((-1,))
         out = u_bar + u0
 
+        if return_KS:
+            new_K=np.zeros((4,12))
+            new_S=np.zeros((12,12))
+
+            # print S.shape
+            # print 
+            new_K[:,ctrl_indx]=K[:,:]
+            j=0
+            for i in ctrl_indx:
+                new_S[i,ctrl_indx]=S[j,:]
+                j+=1
+            #print S
+            #print new_S[ctrl_indx,:][:,ctrl_indx]-S
+            #raw_input()
+            #new_S[:,ctrl_indx][ctrl_indx]=S[:,:]
+            return out,(new_K,new_S)
         return out
 
     pass
@@ -78,23 +98,25 @@ class LQRController(VectorSystem):
                               12,  # number of inputs, the state of the quadrotor
                               4)  # number of outputs, the inputs to four motors
 
-        v=np.array([2.,0.,0.])
+        v=np.array([1.9,1.9,0.])
         target_state=np.zeros(12)
         target_state[2]=1
+        target_state[1]=-1
         target_state[6:9]=v[:]
-        ctrl_indx=[1,2]+range(3,12)
+        ctrl_indx=[2]+range(3,12)
 
         self.ctrl1=StableStateController(plant, dynamics_linearizer,target_state,ctrl_indx)
 
-        v=np.array([-2.,0.,0.])
+        v=-v
+        #v=np.array([0.,-2.5,0.])
         target_state=np.zeros(12)
-        target_state[2]=1
+        target_state[2]=1.
         target_state[6:9]=v[:]
-        ctrl_indx=[1,2]+range(3,12)
+        ctrl_indx=[2]+range(3,12)
 
         self.ctrl2=StableStateController(plant, dynamics_linearizer,target_state,ctrl_indx)
 
-        v=np.array([0.,0.,0.])
+        v=np.array([0.,-2.,0.])
         target_state=np.zeros(12)
         target_state[2]=1.
         target_state[6:9]=v[:]
@@ -110,8 +132,14 @@ class LQRController(VectorSystem):
         # target_state=np.zeros(12)
         # target_state[6:9]=v[:]
         # target_state[3:6]=rpy[:]
-
+        self.last_state=np.zeros(3)
         self.count=0
+
+        self.end=False
+
+        self.record=[]
+        for i in range(17):
+            self.record.append([])
 
         #self.target_state=target_state
         #self.target_u=target_u
@@ -126,13 +154,45 @@ class LQRController(VectorSystem):
         """
         current_state = u
 
+        #print current_state[0]
+
+        if self.count!=0 and np.linalg.norm(self.last_state-current_state[0:3])>=1 and (not self.end):
+            write_data(self.record,'./dqxr.pkl')
+            self.count=0
+            self.end=True
+
         self.count+=1
 
-        if self.count<1000:
+        if self.count<600:
             out=self.ctrl1.get_output(current_state)
         else:
-            out=self.ctrl3.get_output(current_state)
+            out=self.ctrl2.get_output(current_state,R = 3*np.identity(4))
         y[:] = out
+
+        for i in range(12):
+            #print i
+            self.record[i].append(current_state[i])
+            #print self.record[i],current_state[i]
+            #raw_input()
+        for i in range(4):
+            self.record[12+i].append(out[i])
+        #print self.record[0],current_state[i]
+        #raw_input
+        #print len(self.record[0])
+        tt=context.get_time()
+        self.record[16].append(tt)
+        self.last_state=current_state[0:3]
+
+def write_data(record,file):
+
+    import pickle as pkl
+    record=np.array(record)
+    #print record[0,0:20]
+    with open(file, 'wb') as f:
+        pkl.dump(record,f)
+    print record[0,0:20],'done'
+    pass
+
 
 
 if __name__ == "__main__":
@@ -153,7 +213,7 @@ if __name__ == "__main__":
                         default="quadrotor")
     MeshcatVisualizer.add_argparse_argument(parser)
     args = parser.parse_args()
-
+Sqr
     if args.model == "quadrotor":
         plant = Quadrotor()
         linearizer = QuadrotorDynamicsLinearizer()
@@ -165,6 +225,7 @@ if __name__ == "__main__":
 
     def initial_state_gen():
         return controller.ctrl1.target_state
+        #return np.zeros(12)
         # return np.random.randn(12,)
 
     # Display in meshcat

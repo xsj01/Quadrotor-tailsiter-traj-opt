@@ -41,7 +41,7 @@ def rot_mat(theta,axis,autodiff=False):
 class TailsitterDynamicsLinearizer:
     """ Linearizer for obtaining the linearized tailsitter system around a nominal point
     """
-    def __init__(self, m_arg=0.5, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):
+    def __init__(self, m_arg=0.1, L_arg=0.175, I_arg=default_moment_of_inertia(), kF_arg=1.0, kM_arg=0.0245):
         # Set model constants
         self.g_ = 9.81
         self.m_ = m_arg

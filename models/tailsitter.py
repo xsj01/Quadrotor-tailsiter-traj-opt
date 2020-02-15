@@ -127,11 +127,14 @@ class Tailsitter(LeafSystem):
 
         # Convert roll-pitch-yaw to quaternion
         quaternion_wxyz = RollPitchYaw(state[3:6]).ToQuaternion().wxyz()
-        out[:4] = quaternion_wxyz[::-1]
+        #out[:4] = quaternion_wxyz[::-1]
+        #out[0]=-out[0]
+        #out[2]=-out[2]
         #out[3] = quaternion_wxyz[0]
-
+        out[0:4]=quaternion_wxyz[:]
         # set x and z pos
         out[4:] = state[:3]
+
 
         # Send output
         output.SetFromVector(out)
@@ -369,7 +372,15 @@ class Tailsitter(LeafSystem):
 
         mp.AddConstraint(F_gravity_2[1]+F_aero_2[1]==0)
         mp.AddConstraint(F_gravity_2[2]+F_aero_2[2]==0)
-        mp.AddConstraint(beta==beta0)
+
+        mp.AddLinearConstraint(alpha<=np.pi)
+        mp.AddLinearConstraint(alpha>=-np.pi)
+        mp.AddLinearConstraint(beta<=np.pi/2)
+        mp.AddLinearConstraint(beta>=-np.pi/2)
+
+        mp.AddLinearConstraint(theta2<=np.pi)
+        mp.AddLinearConstraint(theta2>=-np.pi)
+        #mp.AddConstraint(beta==beta0)
 
         #mp.AddLinearConstraint(alpha>=-deg2rad(30))
         #mp.AddQuadraticCost(Q)
@@ -667,9 +678,9 @@ if __name__ == "__main__":
 
     # Add controller
     # controller = builder.AddSystem(LQRController(plant, [0, 0, 1]))
-    v=np.array([2.,0.,0.])
+    v=np.array([0.,2.,0.])
     ts=Tailsitter()
-    _,_,u,rpy=ts.cal_optimal_transpoet(v)
+    _,_,u,rpy=ts.cal_alpha_beta_u_by_V(v)
     print u,rpy
     initial_state=np.zeros(12)
     initial_state[2]=1.
