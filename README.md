@@ -7,4 +7,5 @@ MIT 6.832 Underactuated Robotics (19S) course project. Our report is available a
 
 ## Usages
 To run example:
+
 `python -m lqr.lqr -M tailsitter`
